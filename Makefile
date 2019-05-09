@@ -10,7 +10,7 @@ istat:
 	$(CC) $(CCFLAGS) $(DEPS) -o istat istat.c
 
 istatd:
-	$(CC) $(CCFLAGS) $(LIBS) $(DEPS) -o istatd istatd.c 
+	$(CC) $(CCFLAGS) $(DEPS) -o istatd istatd.c $(LIBS)
 
 install: all
 	cp ./istat $(IPATH)istat
