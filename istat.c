@@ -13,6 +13,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 
 #define SERVER_KEY_PATHNAME "/tmp/istatd_server_key"
 #define PROJECT_ID 'A'
@@ -101,7 +102,7 @@ int main(int argc,char **argv){
 	else
 		isActive = 1;
 
-	if (isActive){ //init IPC if daemon started
+	if (isActive && (0 == access(SERVER_KEY_PATHNAME, 0))){ //init IPC if daemon started
     if ((qid = msgget (IPC_PRIVATE, 0660)) == -1) {
         perror ("msgget: myqid");
         return 1;
@@ -130,11 +131,8 @@ int main(int argc,char **argv){
 
 	for (i=1; i<argc; i++){
 		if (!strcmp(argv[i], "start")){
-			if (isActive){
-				/*f = fopen("/etc/istatd/.lock", "rw");
-				if (f == NULL)
-					execvp("./istatd", argv);
-				fclose(f);*/
+			struct stat st = {0}; //folder check
+			if (isActive && !(stat("/etc/istatd/", &st) == -1)){
 				if(kill(getDaemonPID(), 0)){
 					printf("Can't connect to istatd. Are you root?\n");
 					return 1;
@@ -146,7 +144,6 @@ int main(int argc,char **argv){
 				kill(getDaemonPID(), SIGUSR1);
 				return 0;
 			};
-			//printf("starting\n");
 			if (0 == access("./istatd", 0))
 				execvp("./istatd", argv);
 			else
