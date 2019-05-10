@@ -83,6 +83,7 @@ void printHelp(){
 	printf("select iface [iface] - select interface for sniffing\n");
 	printf("stat​ ​[iface] - ​ show all collected statistics for particular interface, if iface omitted - for all interfaces\n\n");
 	printf("stat​us - ​ show current status\n");
+	printf("terminate - ​ terminate istatd gracefully\n");
 	printf("--help - show usage information\n");
 }
 
