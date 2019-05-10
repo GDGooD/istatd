@@ -52,15 +52,14 @@ struct msgstat{
 
 int checkLock(){
 	int lfp;
-	lfp=open("/etc/istatd/.lock",O_RDWR|O_CREAT,0666);
+	lfp=open("/etc/istatd/.lock",O_RDONLY,0666);
 	if (lfp<0) 
-		return 1;
-	if (lockf(lfp,F_TLOCK,0)<0){
+		return 0;
+	if (lockf(lfp,F_TEST,0)<0){
 		close(lfp);
 		return 1;
 	}
 	close(lfp);
-	remove("/etc/istatd/.lock");
 	return 0;
 }
 
@@ -132,7 +131,7 @@ int main(int argc,char **argv){
 	for (i=1; i<argc; i++){
 		if (!strcmp(argv[i], "start")){
 			struct stat st = {0}; //folder check
-			if (isActive && !(stat("/etc/istatd/", &st) == -1)){
+			if (isActive){
 				if(kill(getDaemonPID(), 0)){
 					printf("Can't connect to istatd. Are you root?\n");
 					return 1;
@@ -150,7 +149,7 @@ int main(int argc,char **argv){
 				execvp("/usr/bin/istatd", argv);
 		}
 		if (!strcmp(argv[i], "status")){
-			if (isActive){
+			if (checkLock()){
 				printf("Active\n");
 				if(kill(getDaemonPID(), 0)){
 					printf("Can't connect to istatd. Are you root?\n");
@@ -172,6 +171,12 @@ int main(int argc,char **argv){
 			else
 				printf("Inactive\n");
 			return 0;
+		}
+		if (!strcmp(argv[i], "terminate")){
+			if (checkLock())
+				if (kill(getDaemonPID(), SIGTERM))
+					printf("Can't terminate istatd. Are you root?\n");
+			return 0;					
 		}
 		if(kill(getDaemonPID(), 0)){
 			printf("Can't connect to istatd. Are you root?\n");
