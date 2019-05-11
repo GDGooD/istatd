@@ -52,7 +52,7 @@ struct msgstat{
 
 int checkLock(){
 	int lfp;
-	lfp=open("/etc/istatd/.lock",O_RDONLY,0666);
+	lfp=open("/etc/istatd/.lock",O_RDONLY,0644);
 	if (lfp<0) 
 		return 0;
 	if (lockf(lfp,F_TEST,0)<0){
@@ -97,12 +97,7 @@ int main(int argc,char **argv){
 	key_t msg_queue_key;
   int qid, qid_server;
 
-	if (!checkLock())
-		remove(SERVER_KEY_PATHNAME);
-	else
-		isActive = 1;
-
-	if (isActive && (0 == access(SERVER_KEY_PATHNAME, 0))){ //init IPC if daemon started
+	if (checkLock()){ //init IPC if daemon started
     if ((qid = msgget (IPC_PRIVATE, 0660)) == -1) {
         perror ("msgget: myqid");
         return 1;
@@ -132,7 +127,7 @@ int main(int argc,char **argv){
 	for (i=1; i<argc; i++){
 		if (!strcmp(argv[i], "start")){
 			struct stat st = {0}; //folder check
-			if (isActive){
+			if (checkLock()){
 				if(kill(getDaemonPID(), 0)){
 					printf("Can't connect to istatd. Are you root?\n");
 					return 1;
@@ -147,8 +142,9 @@ int main(int argc,char **argv){
 			if (0 == access("./istatd", 0))
 				execvp("./istatd", argv);
 			else
-				execvp("/usr/bin/istatd", argv);
+				execvp("istatd", argv);
 		}
+
 		if (!strcmp(argv[i], "status")){
 			if (checkLock()){
 				printf("Active\n");
@@ -173,29 +169,25 @@ int main(int argc,char **argv){
 				printf("Inactive\n");
 			return 0;
 		}
+
 		if (!strcmp(argv[i], "terminate")){
 			if (checkLock())
 				if (kill(getDaemonPID(), SIGTERM))
 					printf("Can't terminate istatd. Are you root?\n");
 			return 0;					
 		}
-		if(kill(getDaemonPID(), 0)){
-			printf("Can't connect to istatd. Are you root?\n");
-			return 1;
-		}			
+	
 		if (!strcmp(argv[i], "stop")){
-			if (0 == access(SERVER_KEY_PATHNAME, 0)) { 
+			if (checkLock()) { 
 				msgcommand.message_type = 1;
 				msgcommand.message.qid = qid;
 				msgcommand.message.command = 1;
 				msgsnd (qid_server, &msgcommand, sizeof (struct msg_command), 0);
 				kill(getDaemonPID(), SIGUSR1);
-				return 0;
-			} 
-			else { 
-				return 0;
 			}
+			return 0;
 		}
+
 		if (!strcmp(argv[i], "show")){
 			if (!strcmp(argv[i+2], "count")){
 				struct in_addr tmp;
@@ -223,6 +215,7 @@ int main(int argc,char **argv){
 				return 0;
 			}
 		}
+
 		if (!strcmp(argv[i], "select")){
 			if (!strcmp(argv[i+1], "iface")){
 				if (argc < 4){
@@ -242,6 +235,7 @@ int main(int argc,char **argv){
 				kill(getDaemonPID(), SIGUSR1);
 			}
 		}
+
 		if (!strcmp(argv[i], "stat")){
 				msgcommand.message_type = 1;
 				msgcommand.message.qid = qid;
@@ -254,31 +248,23 @@ int main(int argc,char **argv){
 					strcpy(msgstring.message.string, argv[i+1]);
 				else
 					strcpy(msgstring.message.string, "_1_");
-				//printf("client: send iface %s.\n", msgstring.message.string);
 				msgsnd (qid_server, &msgstring, sizeof (struct msg_string), 0);
 				usleep (1000);
 				kill(getDaemonPID(), SIGUSR1);
-				//return 0;
 				BTREE treev4 = createTree();
-				//printf("client: receiving\n");
 				while(1){
 					if (msgrcv(qid, &msgstat, sizeof (struct msg_stat), 0, 0) == -1){
 						printf("No response from daemon\n");
 						return 1;
 					};
-					//printf("client: received %d %d\n", msgstat.message.ip, msgstat.message.count);
 					if((msgstat.message.count == 0))
 						break;
-					//printf("client: adding to tree");
 					treev4 = addToTree(treev4, msgstat.message.ip, msgstat.message.count);
-					//printf("client: added");
 				}
 				printf("             IP Count\n");
 				printInorder(treev4);
 				return 0;
 		}
 	}
-
-
 	return 0;
 }

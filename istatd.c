@@ -269,7 +269,7 @@ int main(int argc,char **argv)
 		struct stat st = {0}; //folder check
 		
 		if (stat("/etc/istatd/", &st) == -1) {
-			if (mkdir("/etc/istatd/", 0700)){
+			if (mkdir("/etc/istatd/", 0755)){
 				printf("Can't start istatd. Are you root?\n");
 				return 1;
 			}
