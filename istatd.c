@@ -397,7 +397,6 @@ int main(int argc,char **argv)
 			devinit = NULL;
 			for(pcap_if_t *d=alldevs; d!=NULL; d=d->next) {
 				if (!strcmp(settings.dev, "")){
-					printf("strcpy\n");
 					strcpy(settings.dev, d->name);
 				}
 				if (strncmp(d->name, settings.dev, 15))
@@ -465,6 +464,9 @@ int main(int argc,char **argv)
 								if (msgrcv(qid, &msgstring, sizeof (struct msg_string), 2, IPC_NOWAIT) == -1){
 									break;
 								}
+								if (!strcmp(msgstring.message.string, settings.dev))
+									sumtreev4 = treev4;
+								else
 								if (!strncmp(msgstring.message.string, "_1_", 3))
 									sumtreev4 = getStatAll();
 								else
@@ -474,7 +476,8 @@ int main(int argc,char **argv)
 								sendInorder(sumtreev4, msgstat);
 								msgstat.message.count = 0;
 								msgsnd (msgstat.message.qid, &msgstat, sizeof (struct msg_stat), 0);
-								deleteTree(sumtreev4);
+								if (strcmp(msgstring.message.string, settings.dev))
+									deleteTree(sumtreev4);
 							break;
 
 							case 5: //send status
