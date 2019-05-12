@@ -122,7 +122,7 @@ int init_daemon()
 
     // Changing the working directory
     chdir("/etc/istatd/");
-		lfp=open(".lock",O_RDWR|O_CREAT,0666);
+		lfp=open(".lock",O_RDWR|O_CREAT,0644);
 		if (lfp<0) 
 			return -1;
 		if (lockf(lfp,F_TLOCK,0)<0) 

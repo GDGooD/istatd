@@ -188,6 +188,11 @@ int main(int argc,char **argv){
 			return 0;
 		}
 
+		if(!checkLock()){
+			printf("istatd is not active\n");
+			return 1;
+		}
+
 		if (!strcmp(argv[i], "show")){
 			if (!strcmp(argv[i+2], "count")){
 				struct in_addr tmp;
