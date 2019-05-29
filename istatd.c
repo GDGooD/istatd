@@ -78,7 +78,6 @@ pcap_t* descr = NULL;
 
 struct settings{
 	char *dev; //current
-	char *lastdev; //last success
 	char mode; // 0 stop 1 start 2 ip stat 3 set iface  4 iface stat 5 status
 };
 
@@ -122,7 +121,7 @@ int init_daemon()
 
     // Changing the working directory
     chdir("/etc/istatd/");
-		lfp=open(".lock",O_RDWR|O_CREAT,0666);
+		lfp=open(".lock",O_RDWR|O_CREAT,0644);
 		if (lfp<0) 
 			return -1;
 		if (lockf(lfp,F_TLOCK,0)<0) 
@@ -243,7 +242,7 @@ int main(int argc,char **argv)
 		int i = 0;
 		char errbuf[PCAP_ERRBUF_SIZE]; 
 		struct settings settings;
-		pcap_if_t *alldevs;
+		pcap_if_t *alldevs = NULL;
 		pcap_if_t *devinit = NULL; 
 		const u_char *packet; 
 		struct pcap_pkthdr hdr;
@@ -269,7 +268,7 @@ int main(int argc,char **argv)
 		struct stat st = {0}; //folder check
 		
 		if (stat("/etc/istatd/", &st) == -1) {
-			if (mkdir("/etc/istatd/", 0700)){
+			if (mkdir("/etc/istatd/", 0755)){
 				printf("Can't start istatd. Are you root?\n");
 				return 1;
 			}
@@ -290,8 +289,8 @@ int main(int argc,char **argv)
 		};
 
 		settings.mode = 0; //start by default
-		settings.dev = NULL;
-		settings.lastdev = NULL;
+		settings.dev = (char *)malloc((15+1)*sizeof(char));
+		strcpy(settings.dev, "");
 
 		if (0 == access(SERVER_KEY_PATHNAME, 0)) { //init IPC
 			if (remove(SERVER_KEY_PATHNAME)){
@@ -384,6 +383,9 @@ int main(int argc,char **argv)
 					break;
 			}
 
+			if(alldevs != NULL)
+				pcap_freealldevs(alldevs);
+
 			//get device list
 			if(pcap_findalldevs(&alldevs, errbuf)){
 				printf("%s\n", errbuf);
@@ -394,8 +396,9 @@ int main(int argc,char **argv)
 			restarting = 0;
 			devinit = NULL;
 			for(pcap_if_t *d=alldevs; d!=NULL; d=d->next) {
-				if (settings.dev == NULL)
-					settings.dev = d->name;
+				if (!strcmp(settings.dev, "")){
+					strcpy(settings.dev, d->name);
+				}
 				if (strncmp(d->name, settings.dev, 15))
 					continue;
 				devinit = d;
@@ -414,9 +417,8 @@ int main(int argc,char **argv)
 			// open device for reading 
 			descr = pcap_open_live(settings.dev, BUFSIZ, 0, 0, errbuf); 
 			if(descr == NULL) {
-					printf("Can't open device for listening. Are you root?\n");
-					remove(SERVER_KEY_PATHNAME);
-					return 1;
+					settings.mode = 1;
+					continue;
 			} 
 
 
@@ -462,6 +464,9 @@ int main(int argc,char **argv)
 								if (msgrcv(qid, &msgstring, sizeof (struct msg_string), 2, IPC_NOWAIT) == -1){
 									break;
 								}
+								if (!strcmp(msgstring.message.string, settings.dev))
+									sumtreev4 = treev4;
+								else
 								if (!strncmp(msgstring.message.string, "_1_", 3))
 									sumtreev4 = getStatAll();
 								else
@@ -471,7 +476,8 @@ int main(int argc,char **argv)
 								sendInorder(sumtreev4, msgstat);
 								msgstat.message.count = 0;
 								msgsnd (msgstat.message.qid, &msgstat, sizeof (struct msg_stat), 0);
-								deleteTree(sumtreev4);
+								if (strcmp(msgstring.message.string, settings.dev))
+									deleteTree(sumtreev4);
 							break;
 
 							case 5: //send status
